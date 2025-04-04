@@ -1,38 +1,83 @@
-bash:
+# ppo_path_planning
+基于ppo的路径规划，便于编写环境，ppo算法源于https://github.com/tinyzqh/light_mappo  
+在mappo中将智能体数量为1即ppo
 
-# 训练代码
-main.py
-# 查看训练过程
-tensorboard --logdir=C:\Users\95718\Desktop\vscode\Program\RL_Homework\RL_Homework1\ppo-to-solve-simple-maze-main\PPO_logs\Maze_v1\tensorboard_logs
-# 模型保存
-C:\Users\95718\Desktop\vscode\Program\RL_Homework\RL_Homework1\PPO_preTrained\Maze_v1\PPO_Maze_v1_0_0.pth
-# 游戏展示
-show.py函数
-# 项目代码参考
-https://github.com/pigBond/ppo-to-solve-simple-maze
+## 环境
+  强化学习的environment与agent交互部分在env_core.py中，包括智能体的运动学模型、地图信息、奖励函数等。
+```
+      def __init__(self):
+        self.agent_num = 1  # 设置智能体的个数
+        self.obs_dim = 4  # 设置智能体的观测纬度
+        self.action_dim = 1  # 设置智能体的动作纬度
+        self.u_max = math.pi / 3  # 最大航向角速度
+        self.delta_t = 0.2  # 仿真步长
+        self.v = 4  # 巡航速度
+        self.agent_size = 1  # 智能体半径
+        self.safe_distance = 2  # 安全距离
+        self.reward_co = [1, 8, 12, 15]  # reward_coefficient:奖励系数
+        
+        self.u = 0  # 航向角速度
+        self.time = 0  # 时间
+        self.done = [False]  # 是否完成
+        self.t_ach = [300]  # 完成的时间
+        self.states = []
+        
+        # 加载地图（线段）
+        self.map1 = map.Map()
+        self.map_limit = self.map1.limit()
+        self.target = [45, 25]  # 目标点位置
+```
 
+## 地图
+  地图在envs/map.py，包括地图边界与障碍物，以线段的形式表示。在map.py中将线段储存为三维列表，在env_core.py中初始化。
+```
+    def limit(self):
 
+        x = self.x_range
+        y = self.y_range
 
+        # 地图边界
+        margin = [[[0, 0], [x, 0]], [[x, 0], [x, y]], [[x, y], [0, y]], [[0, 0], [0, y]]]
+        # 障碍物（线段）
+        barriers = [[[10, 15], [20, 15]],
+                    [[20, 15], [20, 0]],
+                    [[28, 15], [28, 30]],
+                    [[40, 0], [40, 15]]]
 
+        margin.extend(barriers)
+        map_limit = margin
+        return map_limit
+```
+  
+## 输出图片
+  reward、loss等强化学习曲线在result中通过tensorboard --logdir xxx命令查看。
+  运动轨迹图通过envs/env_runner.py输出，图片保存在train目录和train/picture目录下。
+```
+            if episode % 10 == 0:
+                # 画障碍物
+                plt.plot([10, 20], [15, 15], color="black", linewidth=1.0, linestyle="-")
+                plt.plot([20, 20], [15, 0], color="black", linewidth=1.0, linestyle="-")
+                plt.plot([28, 28], [15, 30], color="black", linewidth=1.0, linestyle="-")
+                plt.plot([40, 40], [0, 15], color="black", linewidth=1.0, linestyle="-")
+                # 画边框
+                plt.plot([0, 50], [0, 0], color="black", linewidth=1.0, linestyle="-")
+                plt.plot([50, 50], [0, 30], color="black", linewidth=1.0, linestyle="-")
+                plt.plot([50, 0], [30, 30], color="black", linewidth=1.0, linestyle="-")
+                plt.plot([0, 0], [0, 30], color="black", linewidth=1.0, linestyle="-")
 
+                # 画轨迹图
+                plt.scatter(45, 25, s=55, c='black')
+                plt.xlabel('距离/m', fontproperties=font, size=16)
+                plt.ylabel('距离/m', fontproperties=font, size=16)
+                plt.savefig('trajectory' + str(int(episode / 10)) + '.png')
+                plt.clf()
+```
+  
+  默认环境训练四百多轮可以实现这样的效果：
+  图一为轨迹图，图二为奖励曲线
+  
+![轨迹图](https://github.com/m1ntzz/ppo_path_planning/assets/102210809/d82eda3c-7ed5-4f42-aac9-0466c8fabf37)
+![奖励曲线](https://github.com/m1ntzz/ppo_path_planning/assets/102210809/cc53ee7d-7716-4891-8ff0-e4dc2c8d59fa)
 
-## 实例讲解
-
-让我们使用走迷宫的例子来详细讲解PPO算法的可能训练过程。想象一个简单的迷宫，目标是从起点到达终点，迷宫中有固定的障碍物。智能体可以采取的动作有四种：向上走、向下走、向左走、向右走。为了简化，我们假设每走一步得到的即时奖励是-1（鼓励智能体尽快到达终点），到达终点的奖励是+20，撞到墙壁则为-5（作为惩罚）。(PS:本项目实际操作时对奖励的设置进行了调整)
-1. **初始探索**：
-   - 智能体在初始阶段随机探索，例如它尝试向左走一步。
-   - 如果向左走撞到了墙壁，它会得到-5的奖励。这时，PPO算法会收集这一状态、动作和奖励的信息。
-2. **计算优势**：
-   - 根据收集到的数据，PPO算法会计算每个动作的优势。在这个例子中，向左走撞墙的动作，相比其他可能的动作（比如向右走可能会接近终点），会被认为是一个低优势动作。
-3. **策略更新**：
-   - 利用收集到的数据和计算出的优势，PPO开始更新策略。对于撞墙这种低优势的动作，PPO会调整策略，降低未来选择这一动作的概率。
-   - 在策略更新过程中，PPO会保证更新的步伐不会过大，即使发现撞墙的动作非常不利，也不会立即将向左走的概率降到极低，而是通过策略比率的截断来温和调整。
-4. **进一步探索与学习**：
-   - 随着更多的探索和学习，智能体开始理解向着终点方向移动会获得更高的累计奖励。例如，它发现向右走能够避开障碍物，并且逐渐接近终点。
-   - 在这个过程中，PPO算法不断优化策略，提高向着终点方向移动的动作概率。
-5. **战略优化**：
-   - 经过一系列的策略迭代更新后，智能体学会了一个高效的策略来完成迷宫任务。它能够根据当前位置，动态选择最优的动作来最快地达到终点。
-   - 在这个过程中，智能体可能会发现一些“捷径”——这些特定的动作序列能够更快地到达终点，这些都是通过PPO算法不断优化和探索得到的。
-
-
-
+## 调参
+  在config.py中调参，效果不好先找环境bug，再调整奖励函数，最后考虑调参
