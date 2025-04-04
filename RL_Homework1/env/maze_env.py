@@ -13,9 +13,9 @@ class MazeEnv(gym.Env):
         self.maze = np.array(maze)
         self.reward_array = np.zeros_like(self.maze)  # 创建一个与maze大小相同的数组来存储动态奖励值
         # 路的初始奖励为0
-        self.reward_array[self.maze == 2] = 1  # 起点奖励为-1
-        self.reward_array[self.maze == 3] = 20 * n  # 终点奖励为-20*n
-        self.reward_array[self.maze == 1] = 5  # 墙奖励为-5
+        self.reward_array[self.maze == 2] = -1  # 起点奖励为-1
+        self.reward_array[self.maze == 3] = -20 * n  # 终点奖励为-20*n
+        self.reward_array[self.maze == 1] = -5  # 墙奖励为-5
         
         self.screen_size = screen_size  # 屏幕尺寸
         self.cell_size = screen_size // n  # 每个单元格的像素大小
@@ -72,9 +72,9 @@ class MazeEnv(gym.Env):
         self.step_count = 0
         self.visited = set([tuple(self.state)])  # 重置访问位置记录
         self.reward_array = np.zeros_like(self.maze)  # 重置奖励数组
-        self.reward_array[self.maze == 2] = 1  # 起点奖励为-1
-        self.reward_array[self.maze == 3] = 20 * self.n  # 终点奖励为-20*n
-        self.reward_array[self.maze == 1] = 5  # 墙奖励为-5
+        self.reward_array[self.maze == 2] = -1  # 起点奖励为-1
+        self.reward_array[self.maze == 3] = -20 * self.n  # 终点奖励为-20*n
+        self.reward_array[self.maze == 1] = -5  # 墙奖励为-5
         if self.render_mode=="show":
             self.render_static()  # 重新渲染静态元素
         return self.state
@@ -98,56 +98,29 @@ class MazeEnv(gym.Env):
         else:
             self.effective_movement = False
             print("错误的动作!")
-            return self.state, -10000, False, {}  # 无效动作返回特别大的负奖励
+            return self.state, -10000, False, {}  # 无效动作返回负奖励
 
         # 检查是否越界
         if not self.is_within_bounds(x, y):
             self.effective_movement = False
-            return self.state, -1000000, False, {}  # 越界返回特别大的负奖励
+            return self.state, -1000000, False, {}  # 越界返回负奖励
         else:
             self.effective_movement = True
 
         if self.maze[x, y] == 1:
             # 撞墙,保持在原位置
-            # return self.current_position, reward, done
-            self.reward_array[x, y] += 100  # 更新撞墙位置的奖励值
-            return self.state, -1*self.reward_array[x, y], False, {}
+            self.reward_array[x, y] -= 100  # 更新撞墙位置的惩罚值
+            return self.state, self.reward_array[x, y], False, {}
         elif (x, y) == tuple(self.goal) and self.maze[x, y] == 3:
             # 到达终点
-            # print(
-            #     "**********************************************************************"
-            # )
-            # print("到达终点!")
-            # print(
-            #     "**********************************************************************"
-            # )
-            return (x, y), 100000000000, True, {}
+            return (x, y), 100000000000, True, {}  # 到达终点的奖励保持不变
         else:
             # 前面是路,正常前进
             self.state = np.array([x, y])
             self.visited.add(tuple(self.state))
             self.step_count += 1
-
-            # if tuple(self.state) in self.visited:
-            #     reward = -2  # 访问已探索位置
-            # else:
-            #     reward = -1  # 探索新位置
-
-            self.reward_array[x, y] += 1  # 更新访问位置的奖励值
-
-            if self.effective_movement is True:
-                # print(
-                #     "====================================================================="
-                # )
-                # print("本次动作有效")
-                # print("动作: ", directions[action])
-                # print("得到位置: ", self.state)
-                # print("步数: ", self.step_count)
-                # print(
-                #     "====================================================================="
-                # )
-                self.effective_movement = False
-            return self.state, -1*self.reward_array[x, y], False, {}
+            self.reward_array[x, y] -= 1  # 更新访问位置的惩罚值
+            return self.state, self.reward_array[x, y], False, {}
 
     def render(self):
         if self.mode == "single":

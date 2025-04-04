@@ -170,8 +170,11 @@ if __name__ == "__main__":
     
     # 初始化tensorboard writer
     tensorboard_dir = log_dir + '/tensorboard_logs'
-    if not os.path.exists(tensorboard_dir):
-        os.makedirs(tensorboard_dir)
+    if os.path.exists(tensorboard_dir):
+        # 清理旧的tensorboard日志
+        import shutil
+        shutil.rmtree(tensorboard_dir)
+    os.makedirs(tensorboard_dir)
     writer = SummaryWriter(tensorboard_dir)
 
     # 打印和记录变量
@@ -209,11 +212,18 @@ if __name__ == "__main__":
 
             # 在日志文件中记录
             if time_step % log_freq == 0:
+                # 计算平均奖励
                 log_avg_reward = log_running_reward / log_running_episodes
                 log_avg_reward = round(log_avg_reward, 4)
+                
+                # 记录到CSV文件
                 log_f.write('{},{},{}\n'.format(i_episode, time_step, log_avg_reward))
                 log_f.flush()
-                writer.add_scalar('Training/Average_Reward', log_avg_reward, time_step)
+                
+                # 只记录一个reward指标到tensorboard，使用新的名称
+                writer.add_scalar('Training/Reward', log_avg_reward, time_step)
+                
+                # 重置计数器
                 log_running_reward = 0
                 log_running_episodes = 0
 
