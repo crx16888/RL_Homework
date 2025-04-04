@@ -1,7 +1,11 @@
 bash:
 
+# 训练代码
+main.py
 # 查看训练过程
 tensorboard --logdir=C:\Users\95718\Desktop\vscode\Program\RL_Homework\RL_Homework1\ppo-to-solve-simple-maze-main\PPO_logs\Maze_v1\tensorboard_logs
+# 模型保存
+C:\Users\95718\Desktop\vscode\Program\RL_Homework\RL_Homework1\PPO_preTrained\Maze_v1\PPO_Maze_v1_0_0.pth
 # 游戏展示
 show.py函数
 # 项目代码参考

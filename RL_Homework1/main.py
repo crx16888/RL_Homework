@@ -31,7 +31,8 @@ if __name__ == "__main__":
         [0, 1, 0, 1, 3],
     ]
 
-    has_continuous_action_space = False
+    has_continuous_action_space = True  # 使用连续动作空间
+    action_std_init = 0.1  # 初始动作标准差，用于连续动作空间的探索
 
     max_ep_len = 400  # max timesteps in one episode 
     # 单个训练周期内的最大时间步数，超过这个数值后，周期自动结束
@@ -69,7 +70,7 @@ if __name__ == "__main__":
 
     # 获取环境状态维度和动作维度
     state_dim = env.observation_space.shape[0]
-    action_dim = env.action_space.n
+    action_dim = env.action_space.shape[0]  # 连续动作空间的维度
 
     # print("state_dim = ", state_dim)
     # print("action_dim = ", action_dim)
@@ -83,7 +84,7 @@ if __name__ == "__main__":
         K_epochs,
         eps_clip,
         has_continuous_action_space,
-        action_std,
+        action_std_init,  # 使用初始化的动作标准差
     )
 
     # 输出参数
