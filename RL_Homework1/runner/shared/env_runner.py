@@ -75,39 +75,39 @@ class EnvRunner(Runner):
 
             if episode % 10 != 0 and episode % 5 == 0:
                 # 画障碍物
-                plt.plot([10, 20], [15, 15], color="black", linewidth=1.0, linestyle="-")
-                plt.plot([20, 20], [15, 0], color="black", linewidth=1.0, linestyle="-")
-                plt.plot([28, 28], [15, 30], color="black", linewidth=1.0, linestyle="-")
-                plt.plot([40, 40], [0, 15], color="black", linewidth=1.0, linestyle="-")
+                plt.plot([-0.3, -0.1], [0.0, 0.0], color="black", linewidth=1.0, linestyle="-")
+                plt.plot([-0.1, -0.1], [0.0, -0.5], color="black", linewidth=1.0, linestyle="-")
+                plt.plot([0.1, 0.1], [0.0, 0.5], color="black", linewidth=1.0, linestyle="-")
+                plt.plot([0.3, 0.3], [-0.5, 0.0], color="black", linewidth=1.0, linestyle="-")
                 # 画边框
-                plt.plot([0, 50], [0, 0], color="black", linewidth=1.0, linestyle="-")
-                plt.plot([50, 50], [0, 30], color="black", linewidth=1.0, linestyle="-")
-                plt.plot([50, 0], [30, 30], color="black", linewidth=1.0, linestyle="-")
-                plt.plot([0, 0], [0, 30], color="black", linewidth=1.0, linestyle="-")
+                plt.plot([-0.5, 0.5], [-0.5, -0.5], color="black", linewidth=1.0, linestyle="-")
+                plt.plot([0.5, 0.5], [-0.5, 0.5], color="black", linewidth=1.0, linestyle="-")
+                plt.plot([0.5, -0.5], [0.5, 0.5], color="black", linewidth=1.0, linestyle="-")
+                plt.plot([-0.5, -0.5], [-0.5, 0.5], color="black", linewidth=1.0, linestyle="-")
 
-                # 画轨迹图
-                plt.scatter(45, 25, s=55, c='black')
-                plt.xlabel('距离/m', fontproperties=font, size=16)
-                plt.ylabel('距离/m', fontproperties=font, size=16)
+                # 画轨迹图和目标点
+                plt.scatter(0.4, 0.3, s=55, c='black')
+                plt.xlabel('x', fontproperties=font, size=16)
+                plt.ylabel('y', fontproperties=font, size=16)
                 plt.savefig(r'.\picture\trajectory' + str(int(episode / 5)) + '.png')
                 plt.clf()
 
             if episode % 10 == 0:
                 # 画障碍物
-                plt.plot([10, 20], [15, 15], color="black", linewidth=1.0, linestyle="-")
-                plt.plot([20, 20], [15, 0], color="black", linewidth=1.0, linestyle="-")
-                plt.plot([28, 28], [15, 30], color="black", linewidth=1.0, linestyle="-")
-                plt.plot([40, 40], [0, 15], color="black", linewidth=1.0, linestyle="-")
+                plt.plot([-0.3, -0.1], [0.0, 0.0], color="black", linewidth=1.0, linestyle="-")
+                plt.plot([-0.1, -0.1], [0.0, -0.5], color="black", linewidth=1.0, linestyle="-")
+                plt.plot([0.1, 0.1], [0.0, 0.5], color="black", linewidth=1.0, linestyle="-")
+                plt.plot([0.3, 0.3], [-0.5, 0.0], color="black", linewidth=1.0, linestyle="-")
                 # 画边框
-                plt.plot([0, 50], [0, 0], color="black", linewidth=1.0, linestyle="-")
-                plt.plot([50, 50], [0, 30], color="black", linewidth=1.0, linestyle="-")
-                plt.plot([50, 0], [30, 30], color="black", linewidth=1.0, linestyle="-")
-                plt.plot([0, 0], [0, 30], color="black", linewidth=1.0, linestyle="-")
+                plt.plot([-0.5, 0.5], [-0.5, -0.5], color="black", linewidth=1.0, linestyle="-")
+                plt.plot([0.5, 0.5], [-0.5, 0.5], color="black", linewidth=1.0, linestyle="-")
+                plt.plot([0.5, -0.5], [0.5, 0.5], color="black", linewidth=1.0, linestyle="-")
+                plt.plot([-0.5, -0.5], [-0.5, 0.5], color="black", linewidth=1.0, linestyle="-")
 
-                # 画轨迹图
-                plt.scatter(45, 25, s=55, c='black')
-                plt.xlabel('距离/m', fontproperties=font, size=16)
-                plt.ylabel('距离/m', fontproperties=font, size=16)
+                # 画轨迹图和目标点
+                plt.scatter(0.4, 0.3, s=55, c='black')
+                plt.xlabel('x', fontproperties=font, size=16)
+                plt.ylabel('y', fontproperties=font, size=16)
                 plt.savefig('trajectory' + str(int(episode / 10)) + '.png')
                 plt.clf()
 

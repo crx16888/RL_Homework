@@ -1,0 +1,7 @@
+torch==2.0.0
+gym==0.26.2
+mujoco==2.3.7
+scipy==1.10.1
+numpy==1.24.4
+glfw==2.7.0
+imageio==2.31.5

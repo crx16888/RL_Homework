@@ -27,7 +27,7 @@ class ContinuousActionEnv(object):
         total_action_space = []
         for agent in range(self.num_agent):
             # physical action space
-            u_action_space = spaces.Box(low=-1, high=+1, shape=(self.signal_action_dim,), dtype=np.float32)
+            u_action_space = spaces.Box(low=-0.1, high=0.1, shape=(self.signal_action_dim,), dtype=np.float32)
 
             if self.movable:
                 total_action_space.append(u_action_space)
