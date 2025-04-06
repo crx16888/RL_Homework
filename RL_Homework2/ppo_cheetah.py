@@ -1,4 +1,4 @@
-import gym
+import gymnasium as gym
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -163,7 +163,7 @@ class ReplayBuffer:
 
 # 主训练循环
 def main():
-    env = gym.make('HalfCheetah-v3')
+    env = gym.make('HalfCheetah-v4')
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     state_dim = env.observation_space.shape[0]
@@ -179,13 +179,14 @@ def main():
     episode = 0
     
     while total_steps < max_steps:
-        state = env.reset()
+        state, _ = env.reset()
         episode_reward = 0
         done = False
+        truncated = False
         
-        while not done:
+        while not (done or truncated):
             action, log_prob, value = ppo.select_action(state)
-            next_state, reward, done, _ = env.step(action)
+            next_state, reward, done, truncated, _ = env.step(action)
             mask = 0.0 if done else 1.0
             
             buffer.add(state, action, reward, mask, log_prob, value)

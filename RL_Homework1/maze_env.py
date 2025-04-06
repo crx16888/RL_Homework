@@ -70,6 +70,84 @@ class ContinuousMazeEnv(gym.Env):
         
         return observation, info
 
+    # def step(self, action):
+    #     # 确保动作在动作空间内
+    #     action = np.clip(action, self.action_space.low, self.action_space.high)
+        
+    #     # 计算新位置
+    #     new_position = self.current_position + action
+        
+    #     # 检查是否超出边界
+    #     if np.any(new_position < self.observation_space.low) or np.any(new_position > self.observation_space.high):
+    #         # 如果超出边界，位置不变，给予负奖励
+    #         reward = -1.0
+    #         # 不更新位置
+    #     # 检查路径是否与障碍物碰撞
+    #     elif self._is_path_collision(self.current_position, new_position):
+    #         # 如果碰撞，位置不变，给予更大的负奖励
+    #         reward = -1.0
+    #         # 不更新位置
+    #     else:
+    #         # 确保新位置在观测空间内
+    #         new_position = np.clip(new_position, self.observation_space.low, self.observation_space.high)
+            
+    #         # 更新位置
+    #         self.current_position = new_position
+            
+    #         # 计算到目标的距离
+    #         distance = np.linalg.norm(self.current_position - self.target_position)
+    #         prev_distance = np.linalg.norm(self.current_position - action - self.target_position)
+    #         reward = -0.1 * distance
+    #         # # 1. 距离奖励：基于距离变化的奖励，鼓励朝目标方向移动
+    #         # # 增加距离奖励的权重，使其成为主要的引导信号
+    #         # distance_reward = 1.0 * (prev_distance - distance)  # 如果距离减小，给予正奖励
+    #         # reward = distance_reward
+            
+    #         # # 2. 障碍物避让奖励：距离障碍物越近，惩罚越大
+    #         # min_obstacle_distance = self._get_min_obstacle_distance(self.current_position)
+    #         # obstacle_threshold = 0.1  # 增大安全距离阈值
+    #         # if min_obstacle_distance < obstacle_threshold:
+    #         #     # 非线性惩罚，距离越近惩罚越大
+    #         #     obstacle_penalty = -3.0 * (1.0 - min_obstacle_distance/obstacle_threshold)**2
+    #         #     reward += obstacle_penalty
+            
+    #         # # 3. 方向引导奖励：鼓励智能体朝着目标方向移动，但避开障碍物
+    #         # if not self._is_obstacle_between(self.current_position, self.target_position):
+    #         #     # 如果当前位置和目标之间没有障碍物，给予额外奖励
+    #         #     # 增加此奖励以鼓励找到无障碍路径
+    #         #     reward += 0.5
+            
+    #         # # 4. 目标接近奖励：使用平滑的指数奖励函数
+    #         # # 使用更平缓的指数衰减，避免奖励突变
+    #         # goal_reward = 2.0 * np.exp(-5.0 * distance)
+    #         # reward += goal_reward
+            
+    #         # 如果非常接近目标，给予额外奖励
+    #         if distance < 0.1:
+    #             reward += 10.0
+            
+    #         # 5. 成功到达目标的奖励
+    #         # 使用单一的、明确的成功奖励，避免多层次的奖励叠加
+    #         if distance < 0.05:
+    #             reward += 100.0  # 减小终点奖励，使其与其他奖励更加平衡    
+        
+    #     # 记录轨迹
+    #     self.trajectory.append(self.current_position.copy())
+        
+    #     # 检查是否到达目标
+    #     done = np.linalg.norm(self.current_position - self.target_position) < 0.05
+        
+    #     # 返回观测、奖励、终止标志和信息
+    #     observation = self.current_position.copy()
+    #     info = {}
+        
+    #     # 渲染
+    #     if self.render_mode == "human":
+    #         self.render()
+        
+    #     return observation, reward, done, False, info
+
+
     def step(self, action):
         # 确保动作在动作空间内
         action = np.clip(action, self.action_space.low, self.action_space.high)
@@ -77,52 +155,72 @@ class ContinuousMazeEnv(gym.Env):
         # 计算新位置
         new_position = self.current_position + action
         
-        # 确保新位置在观测空间内
-        new_position = np.clip(new_position, self.observation_space.low, self.observation_space.high)
+        # 保存当前位置到目标的距离，用于后续计算
+        prev_distance = np.linalg.norm(self.current_position - self.target_position)
         
+        # 检查是否超出边界
+        if np.any(new_position < self.observation_space.low) or np.any(new_position > self.observation_space.high):
+            # 如果超出边界，位置不变，给予较小的负奖励，不直接结束回合
+            # 减小边界碰撞惩罚，避免过度惩罚
+            reward = -0.5
+            done = False
+            # 位置不变
+            new_position = self.current_position.copy()
         # 检查路径是否与障碍物碰撞
-        if self._is_path_collision(self.current_position, new_position):
-            # 如果碰撞，位置不变，给予负奖励
-            reward = -1.0
+        elif self._is_path_collision(self.current_position, new_position):
+            # 如果碰撞，位置不变，给予较小的负奖励，不直接结束回合
+            # 减小障碍物碰撞惩罚，避免过度惩罚
+            reward = -0.5
+            done = False
+            # 位置不变
+            new_position = self.current_position.copy()
         else:
+            # 确保新位置在观测空间内
+            new_position = np.clip(new_position, self.observation_space.low, self.observation_space.high)
+            
             # 更新位置
             self.current_position = new_position
             
             # 计算到目标的距离
             distance = np.linalg.norm(self.current_position - self.target_position)
             
-            # 基础奖励：距离越近奖励越高
-            reward = -distance
+            # 初始化奖励
+            reward = 0.0
             
-            # 计算与所有障碍物的最小距离
+            # 1. 基于距离的连续奖励
+            distance_change = prev_distance - distance
+            # 使用平滑的距离奖励函数
+            if distance_change > 0:
+                # 朝目标移动给予适度的正向奖励
+                distance_reward = 2.0 * distance_change
+            else:
+                # 远离目标给予较小的负向奖励
+                distance_reward = 1.0 * distance_change
+            reward += distance_reward
+            
+            # 2. 距离目标的全局奖励
+            # 使用平滑的反比例函数
+            proximity_reward = 0.5 / (1.0 + 2.0 * distance)
+            reward += proximity_reward
+            
+            # 3. 避障奖励
             min_obstacle_distance = self._get_min_obstacle_distance(self.current_position)
-            
-            # 障碍物避让奖励：距离障碍物越近，惩罚越大，但有一个安全距离阈值
-            obstacle_threshold = 0.08  # 安全距离阈值
+            obstacle_threshold = 0.1
             if min_obstacle_distance < obstacle_threshold:
-                # 非线性惩罚，距离越近惩罚越大
-                obstacle_penalty = -2.0 * (1.0 - min_obstacle_distance/obstacle_threshold)**2
+                # 使用较小的避障惩罚
+                obstacle_penalty = -0.1 * (1.0 - min_obstacle_distance/obstacle_threshold)
                 reward += obstacle_penalty
             
-            # 方向奖励：鼓励智能体朝着目标方向移动，但避开障碍物
-            if not self._is_obstacle_between(self.current_position, self.target_position):
-                # 如果当前位置和目标之间没有障碍物，给予额外奖励
-                reward += 0.5
-                
-            # 如果非常接近目标，给予额外奖励
-            if distance < 0.1:
-                reward += 5.0
-            
-            # 如果智能体到达终点，额外给予更大奖励  
+            # 4. 到达目标奖励
             if distance < 0.05:
-                reward += 30.0    
+                reward += 50.0  # 适度的终点奖励
         
         # 记录轨迹
         self.trajectory.append(self.current_position.copy())
         
-        # 检查是否到达目标
-        # 到达终点考虑给一个较大的奖励值？
-        done = np.linalg.norm(self.current_position - self.target_position) < 0.05
+        # 检查是否到达目标（如果没有碰到障碍物）
+        if 'done' not in locals():
+            done = np.linalg.norm(self.current_position - self.target_position) < 0.05
         
         # 返回观测、奖励、终止标志和信息
         observation = self.current_position.copy()
@@ -133,7 +231,6 @@ class ContinuousMazeEnv(gym.Env):
             self.render()
         
         return observation, reward, done, False, info
-
     def _is_collision(self, position):
         """
         检查位置是否与障碍物碰撞

@@ -24,7 +24,7 @@ os.makedirs(model_dir, exist_ok=True)
 # 训练参数
 num_episodes = 1000  # 训练回合数
 max_steps = 200      # 每个回合的最大步数
-update_frequency = 2048  # 更新频率（收集多少步数据后更新一次策略）
+update_frequency = 1024  # 更新频率（收集多少步数据后更新一次策略）- 减小更新频率以提高样本利用率
 
 # 环境和算法参数
 gamma = 0.99        # 折扣因子
@@ -38,6 +38,7 @@ hidden_dim = 128    # 隐藏层维度 - 增加网络容量
 def train():
     # 初始化环境
     # render_mode="human" 表示使用实时可视化模式
+    # env = ContinuousMazeEnv(render_mode="human")
     env = ContinuousMazeEnv(render_mode="None")
     
     # 获取状态和动作维度
@@ -172,8 +173,8 @@ def test(model_path, num_episodes=5):
         
         while not done and step < max_steps:
             # 选择动作（确定性策略）
-            # 疑似现在PPO训练出来的模型均值一直是往右上走，所以效果很差；能走到终点完全是靠右上的趋势+一定的随机性
-            # 此前奖励函数主要基于智能体到目标的距离，没有考虑障碍物的影响。这导致智能体倾向于直接朝右上方（目标位置）移动，而不考虑避障
+            # 使用确定性策略进行测试，避免随机性导致在终点附近徘徊
+            # 改用随机策略了，因为训练失败
             action = agent.policy.get_action(state, deterministic=True)
             
             # # 选择动作（使用与训练相同的随机策略）
