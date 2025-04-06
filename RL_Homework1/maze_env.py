@@ -91,12 +91,31 @@ class ContinuousMazeEnv(gym.Env):
             # 计算到目标的距离
             distance = np.linalg.norm(self.current_position - self.target_position)
             
-            # 奖励函数：距离越近奖励越高，如起点和终点距离0.64
+            # 基础奖励：距离越近奖励越高
             reward = -distance
             
+            # 计算与所有障碍物的最小距离
+            min_obstacle_distance = self._get_min_obstacle_distance(self.current_position)
+            
+            # 障碍物避让奖励：距离障碍物越近，惩罚越大，但有一个安全距离阈值
+            obstacle_threshold = 0.08  # 安全距离阈值
+            if min_obstacle_distance < obstacle_threshold:
+                # 非线性惩罚，距离越近惩罚越大
+                obstacle_penalty = -2.0 * (1.0 - min_obstacle_distance/obstacle_threshold)**2
+                reward += obstacle_penalty
+            
+            # 方向奖励：鼓励智能体朝着目标方向移动，但避开障碍物
+            if not self._is_obstacle_between(self.current_position, self.target_position):
+                # 如果当前位置和目标之间没有障碍物，给予额外奖励
+                reward += 0.5
+                
             # 如果非常接近目标，给予额外奖励
             if distance < 0.1:
-                reward += 10.0
+                reward += 5.0
+            
+            # 如果智能体到达终点，额外给予更大奖励  
+            if distance < 0.05:
+                reward += 30.0    
         
         # 记录轨迹
         self.trajectory.append(self.current_position.copy())
@@ -141,6 +160,43 @@ class ContinuousMazeEnv(gym.Env):
         # 生成路径上的采样点
         for i in range(num_samples + 1):
             t = i / num_samples  # 插值参数，从0到1
+            sample_position = start_position * (1 - t) + end_position * t
+            
+            # 检查采样点是否与障碍物碰撞
+            if self._is_collision(sample_position):
+                return True
+                
+        return False
+        
+    def _get_min_obstacle_distance(self, position):
+        """
+        计算位置到最近障碍物的距离
+        """
+        min_distance = float('inf')
+        
+        for obstacle in self.obstacles:
+            x_min, y_min, width, height = obstacle
+            x_max, y_max = x_min + width, y_min + height
+            
+            # 计算位置到矩形障碍物的最短距离
+            dx = max(x_min - position[0], 0, position[0] - x_max)
+            dy = max(y_min - position[1], 0, position[1] - y_max)
+            distance = np.sqrt(dx**2 + dy**2)
+            
+            min_distance = min(min_distance, distance)
+        
+        return min_distance
+    
+    def _is_obstacle_between(self, start_position, end_position):
+        """
+        检查从起点到终点的直线路径上是否有障碍物
+        """
+        # 使用更多的采样点来提高精度
+        num_samples = 20
+        
+        # 生成路径上的采样点
+        for i in range(1, num_samples):  # 跳过起点和终点
+            t = i / num_samples
             sample_position = start_position * (1 - t) + end_position * t
             
             # 检查采样点是否与障碍物碰撞

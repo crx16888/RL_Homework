@@ -3,6 +3,7 @@ import time
 import numpy as np
 import torch
 import shutil
+from torch.nn.modules.fold import F
 from torch.utils.tensorboard.writer import SummaryWriter
 from maze_env import ContinuousMazeEnv
 from ppo import PPO
@@ -27,17 +28,17 @@ update_frequency = 2048  # 更新频率（收集多少步数据后更新一次�
 
 # 环境和算法参数
 gamma = 0.99        # 折扣因子
-gae_lambda = 0.95   # GAE参数
+gae_lambda = 0.98   # GAE参数 - 增加以更好地平衡偏差和方差
 clip_ratio = 0.2    # PPO裁剪参数
 value_coef = 0.5    # 价值损失系数
-entropy_coef = 0.01 # 熵奖励系数
-lr = 3e-4           # 学习率
-hidden_dim = 64     # 隐藏层维度
+entropy_coef = 0.05 # 熵奖励系数 - 增加以鼓励更多探索
+lr = 5e-4           # 学习率 - 略微增加以加快学习
+hidden_dim = 128    # 隐藏层维度 - 增加网络容量
 
 def train():
     # 初始化环境
     # render_mode="human" 表示使用实时可视化模式
-    env = ContinuousMazeEnv(render_mode="human")
+    env = ContinuousMazeEnv(render_mode="None")
     
     # 获取状态和动作维度
     state_dim = env.observation_space.shape[0]
@@ -158,6 +159,7 @@ def test(model_path, num_episodes=5):
     
     # 加载模型
     agent.load(model_path)
+    print(f"模型已加载: {model_path}")
     
     for episode in range(num_episodes):
         state, _ = env.reset()
@@ -165,12 +167,27 @@ def test(model_path, num_episodes=5):
         done = False
         step = 0
         
+        print(f"\n开始测试回合 {episode+1}/{num_episodes}")
+        print(f"初始位置: [{state[0]:.3f}, {state[1]:.3f}]")
+        
         while not done and step < max_steps:
             # 选择动作（确定性策略）
+            # 疑似现在PPO训练出来的模型均值一直是往右上走，所以效果很差；能走到终点完全是靠右上的趋势+一定的随机性
+            # 此前奖励函数主要基于智能体到目标的距离，没有考虑障碍物的影响。这导致智能体倾向于直接朝右上方（目标位置）移动，而不考虑避障
             action = agent.policy.get_action(state, deterministic=True)
+            
+            # # 选择动作（使用与训练相同的随机策略）
+            # action, log_prob, value = agent.select_action(state)
+            
+            # 输出当前状态和选择的动作
+            print(f"步骤 {step+1}: 位置 [{state[0]:.3f}, {state[1]:.3f}], 动作 [{action[0]:.3f}, {action[1]:.3f}]")
             
             # 执行动作
             next_state, reward, done, _, _ = env.step(action)
+            
+            # 强制渲染每一步
+            env.render()
+            plt.pause(0.01)  # 确保图形更新并处理事件循环
             
             # 更新状态和统计
             state = next_state
@@ -179,8 +196,15 @@ def test(model_path, num_episodes=5):
             
             # 控制渲染速度
             time.sleep(0.05)
+            
+            # 如果到达目标，显示成功信息
+            if done:
+                print(f"成功到达目标! 位置: [{state[0]:.3f}, {state[1]:.3f}]")
         
-        print(f"Test Episode {episode+1}/{num_episodes}, Reward: {episode_reward:.2f}, Steps: {step}")
+        print(f"测试回合 {episode+1}/{num_episodes} 完成, 奖励: {episode_reward:.2f}, 步数: {step}")
+        
+        # 回合结束后暂停一下，让用户有时间查看最终状态
+        time.sleep(1.0)
 
 if __name__ == "__main__":
     import argparse

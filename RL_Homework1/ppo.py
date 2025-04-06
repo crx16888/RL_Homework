@@ -21,13 +21,18 @@ class PolicyNetwork(nn.Module):
         self._init_weights()
     
     def _init_weights(self):
-        for layer in [self.fc1, self.fc2, self.mean_layer]:
-            nn.init.orthogonal_(layer.weight, gain=1.0)
+        # 使用正交初始化，但增加gain值以增加初始探索
+        for layer in [self.fc1, self.fc2]:
+            nn.init.orthogonal_(layer.weight, gain=1.414)  # 使用sqrt(2)作为gain
             nn.init.constant_(layer.bias, 0.0)
         
-        # 初始化log_std层，使初始策略的标准差适中
+        # 均值层使用较小的初始化，避免一开始就有强烈的方向偏好
+        nn.init.orthogonal_(self.mean_layer.weight, gain=0.01)
+        nn.init.constant_(self.mean_layer.bias, 0.0)
+        
+        # 初始化log_std层，使初始策略的标准差较大，增加初始探索
         nn.init.orthogonal_(self.log_std_layer.weight, gain=0.01)
-        nn.init.constant_(self.log_std_layer.bias, 0.0)
+        nn.init.constant_(self.log_std_layer.bias, 0.5)  # 初始标准差约为1.65
     
     def forward(self, x):
         x = F.relu(self.fc1(x))
@@ -43,7 +48,7 @@ class PolicyNetwork(nn.Module):
     
     def get_action(self, state, deterministic=False):
         state = torch.FloatTensor(state)
-        mean, log_std = self(state)
+        mean, log_std = self.forward(state)
         
         if deterministic:
             return mean.detach().numpy()
