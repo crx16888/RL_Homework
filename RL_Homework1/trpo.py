@@ -3,9 +3,9 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import numpy as np
-from torch.distributions import Normal
+from torch.distributions import Normal, kl_divergence
 
-# 策略网络
+# 策略网络 - 与PPO中相同
 class PolicyNetwork(nn.Module):
     def __init__(self, input_dim, output_dim, hidden_dim=64):
         super(PolicyNetwork, self).__init__()
@@ -69,7 +69,7 @@ class PolicyNetwork(nn.Module):
         
         return log_prob, entropy
 
-# 价值网络
+# 价值网络 - 与PPO中相同
 class ValueNetwork(nn.Module):
     def __init__(self, input_dim, hidden_dim=64):
         super(ValueNetwork, self).__init__()
@@ -92,7 +92,7 @@ class ValueNetwork(nn.Module):
         value = self.fc3(x)
         return value
 
-# 经验回放缓冲区
+# 经验回放缓冲区 - 与PPO中相同
 class RolloutBuffer:
     def __init__(self):
         self.states = []
@@ -143,23 +143,23 @@ class RolloutBuffer:
         
         return returns, advantages
 
-# PPO算法
-class PPO:
+# TRPO算法
+class TRPO:
     def __init__(self, state_dim, action_dim, lr=3e-4, gamma=0.99, gae_lambda=0.95,
-                 clip_ratio=0.2, target_kl=0.01, value_coef=0.5, entropy_coef=0.01,
+                 max_kl=0.01, damping=0.1, value_coef=0.5, entropy_coef=0.01,
                  max_grad_norm=0.5, update_epochs=10, hidden_dim=64):
         self.policy = PolicyNetwork(state_dim, action_dim, hidden_dim)
         self.value = ValueNetwork(state_dim, hidden_dim)
         
-        self.policy_optimizer = optim.Adam(self.policy.parameters(), lr=lr)
+        # 只为价值网络设置优化器，策略网络使用TRPO更新
         self.value_optimizer = optim.Adam(self.value.parameters(), lr=lr)
         
         self.buffer = RolloutBuffer()
         
         self.gamma = gamma
         self.gae_lambda = gae_lambda
-        self.clip_ratio = clip_ratio
-        self.target_kl = target_kl
+        self.max_kl = max_kl  # KL散度约束
+        self.damping = damping  # 共轭梯度法的阻尼系数
         self.value_coef = value_coef
         self.entropy_coef = entropy_coef
         self.max_grad_norm = max_grad_norm
@@ -177,6 +177,58 @@ class PPO:
             value = self.value(state)
             
             return action.numpy(), log_prob.numpy(), value.numpy().squeeze()
+    
+    def flat_grad(self, grads):
+        flat_grads = []
+        for grad in grads:
+            flat_grads.append(grad.view(-1))
+        return torch.cat(flat_grads)
+    
+    def get_kl(self, states):
+        # 计算当前策略与旧策略之间的KL散度
+        mu, log_std = self.policy(states)
+        mu_old, log_std_old = mu.detach(), log_std.detach()
+        
+        std = torch.exp(log_std)
+        std_old = torch.exp(log_std_old)
+        
+        dist = Normal(mu, std)
+        dist_old = Normal(mu_old, std_old)
+        
+        kl = kl_divergence(dist_old, dist).sum(1, keepdim=True).mean()
+        return kl
+    
+    def conjugate_gradient(self, states, b, nsteps=10, residual_tol=1e-10):
+        # 使用共轭梯度法求解Ax=b，其中A是Fisher信息矩阵
+        x = torch.zeros_like(b)
+        r = b.clone()
+        p = r.clone()
+        rdotr = torch.dot(r, r)
+        
+        for i in range(nsteps):
+            Ap = self.fisher_vector_product(states, p)
+            alpha = rdotr / (torch.dot(p, Ap) + 1e-8)
+            x += alpha * p
+            r -= alpha * Ap
+            new_rdotr = torch.dot(r, r)
+            if new_rdotr < residual_tol:
+                break
+            beta = new_rdotr / rdotr
+            p = r + beta * p
+            rdotr = new_rdotr
+        return x
+    
+    def fisher_vector_product(self, states, v):
+        # 计算Fisher信息矩阵与向量v的乘积
+        kl = self.get_kl(states)
+        grads = torch.autograd.grad(kl, self.policy.parameters(), create_graph=True)
+        flat_grad_kl = self.flat_grad(grads)
+        
+        kl_v = (flat_grad_kl * v).sum()
+        grads = torch.autograd.grad(kl_v, self.policy.parameters())
+        flat_grad_grad_kl = self.flat_grad(grads)
+        
+        return flat_grad_grad_kl + self.damping * v
     
     def update(self):
         # 将缓冲区数据转换为张量
@@ -198,55 +250,80 @@ class PPO:
         # 标准化优势
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
         
+        # 记录损失值
+        policy_loss = 0
+        value_loss = 0
+        entropy_loss = 0
+        
         # 执行多个epoch的更新
         for _ in range(self.update_epochs):
-            # 重新评估动作
-            logprobs, entropy = self.policy.evaluate(states, actions)
+            # 更新价值网络
             values = self.value(states).squeeze()
-            
-            # 计算比率 r(θ) = π_θ(a|s) / π_θ_old(a|s)
-            ratios = torch.exp(logprobs - old_logprobs)
-            
-            # 计算裁剪的目标函数
-            surr1 = ratios * advantages
-            surr2 = torch.clamp(ratios, 1.0 - self.clip_ratio, 1.0 + self.clip_ratio) * advantages
-            policy_loss = -torch.min(surr1, surr2).mean()
-            
-            # 计算价值损失
             value_loss = F.mse_loss(values, returns)
             
-            # 计算熵奖励
-            entropy_loss = -entropy.mean()
-            
-            # 总损失
-            loss = policy_loss + self.value_coef * value_loss + self.entropy_coef * entropy_loss
-            
-            # 执行梯度更新
-            self.policy_optimizer.zero_grad()
             self.value_optimizer.zero_grad()
-            loss.backward()
-            
-            # 梯度裁剪
-            nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
+            value_loss.backward()
             nn.utils.clip_grad_norm_(self.value.parameters(), self.max_grad_norm)
-            
-            self.policy_optimizer.step()
             self.value_optimizer.step()
             
-            # 计算KL散度，如果过大则提前停止更新
-            with torch.no_grad():
-                mean_new, log_std_new = self.policy(states)
-                std_new = torch.exp(log_std_new)
-                mean_old, log_std_old = self.policy(states)
-                std_old = torch.exp(log_std_old)
+            # 计算策略梯度
+            logprobs, entropy = self.policy.evaluate(states, actions)
+            ratio = torch.exp(logprobs - old_logprobs)
+            surrogate = (ratio * advantages).mean()
+            
+            # 计算策略梯度
+            grads = torch.autograd.grad(surrogate, self.policy.parameters())
+            policy_gradient = self.flat_grad(grads)
+            
+            # 使用共轭梯度法计算搜索方向
+            search_dir = self.conjugate_gradient(states, policy_gradient.detach())
+            
+            # 计算步长
+            gHg = (self.fisher_vector_product(states, search_dir) * search_dir).sum(0, keepdim=True)
+            step_size = torch.sqrt(2 * self.max_kl / (gHg + 1e-8))
+            
+            # 获取当前参数
+            old_params = torch.cat([param.view(-1) for param in self.policy.parameters()])
+            
+            # 线搜索找到满足KL约束的最大步长
+            for i in range(10):
+                # 计算新参数
+                new_params = old_params + step_size * search_dir
                 
-                dist_new = Normal(mean_new, std_new)
-                dist_old = Normal(mean_old, std_old)
+                # 将新参数应用到策略网络
+                index = 0
+                for param in self.policy.parameters():
+                    param_size = param.numel()
+                    param.data.copy_(new_params[index:index + param_size].view(param.size()))
+                    index += param_size
                 
-                kl = torch.distributions.kl.kl_divergence(dist_old, dist_new).sum(dim=-1).mean().item()
+                # 计算KL散度
+                kl = self.get_kl(states)
                 
-                if kl > 1.5 * self.target_kl:
-                    break
+                # 如果KL散度超过约束，减小步长
+                if kl > 1.5 * self.max_kl:
+                    step_size *= 0.5
+                else:
+                    # 计算新的策略损失
+                    new_logprobs, new_entropy = self.policy.evaluate(states, actions)
+                    new_ratio = torch.exp(new_logprobs - old_logprobs)
+                    new_surrogate = (new_ratio * advantages).mean()
+                    
+                    # 如果策略改进，接受更新
+                    if new_surrogate > surrogate:
+                        policy_loss = -new_surrogate
+                        entropy_loss = -new_entropy.mean()
+                        break
+                    else:
+                        step_size *= 0.5
+            
+            # 如果线搜索失败，恢复旧参数
+            if i == 9:
+                index = 0
+                for param in self.policy.parameters():
+                    param_size = param.numel()
+                    param.data.copy_(old_params[index:index + param_size].view(param.size()))
+                    index += param_size
         
         # 清空缓冲区
         self.buffer.clear()
@@ -257,7 +334,6 @@ class PPO:
         torch.save({
             'policy_state_dict': self.policy.state_dict(),
             'value_state_dict': self.value.state_dict(),
-            'policy_optimizer_state_dict': self.policy_optimizer.state_dict(),
             'value_optimizer_state_dict': self.value_optimizer.state_dict(),
         }, path)
     
@@ -265,5 +341,4 @@ class PPO:
         checkpoint = torch.load(path)
         self.policy.load_state_dict(checkpoint['policy_state_dict'])
         self.value.load_state_dict(checkpoint['value_state_dict'])
-        self.policy_optimizer.load_state_dict(checkpoint['policy_optimizer_state_dict'])
         self.value_optimizer.load_state_dict(checkpoint['value_optimizer_state_dict'])
