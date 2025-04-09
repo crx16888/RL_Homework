@@ -12,9 +12,9 @@ from buffer import ReplayBuffer
 # TRPO算法实现
 class TRPO:
     def __init__(self, state_dim, action_dim, device='cpu',
-                 lr_critic=3e-4, gamma=0.99,
-                 gae_lambda=0.95, max_kl=0.01, damping=0.1, ent_coef=0.01,
-                 batch_size=64, n_epochs=10):
+                 lr_critic=1e-4, gamma=0.99,  # 降低学习率以提高稳定性
+                 gae_lambda=0.97, max_kl=0.008, damping=0.1, ent_coef=0.02,  # 调整GAE参数和KL约束
+                 batch_size=128, n_epochs=5):  # 增大批量，减少更新次数
         
         self.actor = Actor(state_dim, action_dim).to(device)
         self.critic = Critic(state_dim).to(device)
@@ -135,8 +135,9 @@ class TRPO:
         returns = torch.FloatTensor(returns).unsqueeze(1).to(self.device)
         advantages = returns - values
 
-        # 标准化优势函数
+        # 改进的优势函数标准化
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+        returns = (returns - returns.mean()) / (returns.std() + 1e-8)  # 标准化回报
 
         # 创建数据集
         dataset = torch.utils.data.TensorDataset(states, actions, old_log_probs, returns, advantages)
@@ -167,9 +168,9 @@ class TRPO:
                 log_probs = dist.log_prob(action_b).sum(dim=1, keepdim=True)
                 entropy = dist.entropy().mean()
                 
-                # 计算策略目标函数
+                # 改进的策略目标函数
                 ratio = (log_probs - old_log_prob_b).exp()
-                surrogate = (ratio * advantage_b).mean()
+                surrogate = (ratio * advantage_b).mean() + self.ent_coef * entropy  # 添加熵正则化
                 
                 # 计算策略梯度
                 grads = torch.autograd.grad(surrogate, self.actor.parameters())

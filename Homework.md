@@ -12,25 +12,35 @@
 
 ---
 
+## trpo和ppo
+此处简要介绍一下trpo和ppo
+trpo:1.使用旧策略和环境交互收集数据
+2.对于每个时间表计算TD error和GAE
+3.多次小批量对于数据集进行遍历计算损失函数
+4.使用梯度下降优化网络，用旧策略数据更新新策略
+ppo
+让trpo变得更好算了
+
+---
+
 ## 作业1
-![Reward Curve](./RL_Homework1/logs/ppo/reward_curve.png)
+![ppo_train](./RL_Homework1/pictures/ppo/ppo.png)
 
 
 可以注意到，当前策略已经基本收敛；并且智能体也能很好地完成点迷宫导航效果
 1.对于奖励函数的设置如下：1.终点给予较大奖励 2.碰撞给予负奖励并done 3.终点附近给予正奖励鼓励前往终点，并且使得曲线更平滑
-2.但是奖励函数的设置非常需要对于该任务的理解，因而仍需调整
+2.但是奖励函数的设置非常依赖对于该任务的理解，因而如果想要效果更好仍需调整
 
 ---
 
 ## 作业2
 ![algorithm_comparison.png](./RL_Homework2/comparison_results/algorithm_comparison.png)
-
-
-可以注意到，当前策略仍还存在一定的震荡，可能是因为半人马智能体存在较为复杂的逻辑；目前只考虑了前进奖励和动作惩罚，并没有考虑翻滚等情况，后期会加入
-当前策略已经基本实现半人马向前运动的效果
+![runs_ppo.png](./RL_Homework2/runs_ppo/training_progress.png)
+![runs_trpo.png](./RL_Homework2/runs_trpo/training_progress.png)
+可以注意到，当前策略已基本完成收敛，实现半人马向前运动的效果
 
 ---
-**陈容贤（南京大学**  
+**陈容贤（南京大学）**  
 **高级策略梯度**  
 **2025年4月7日**  
 **详见** ：https://github.com/crx16888/RL_Homework 

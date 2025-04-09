@@ -1,6 +1,6 @@
 # PPO迷宫智能体训练
 
-本项目使用PPO（Proximal Policy Optimization）算法训练一个能够在连续状态空间迷宫中导航的智能体。
+本项目使用PPO（Proximal Policy Optimization）和trpo算法训练一个能够在连续状态空间迷宫中导航的智能体。
 
 ## 环境说明
 
@@ -34,7 +34,8 @@ tensorboard
 ### 训练智能体
 
 ```bash
-python train.py
+python main.py --mode train --algorithm trpo --episodes 1000 # 可以修改test、trpo
+python main.py --mode compare --episodes 1000
 ```
 
 训练过程中会实时显示迷宫环境和智能体的移动轨迹，并将训练日志保存到`logs`目录。

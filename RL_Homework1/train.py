@@ -28,12 +28,12 @@ max_steps = 200      # 每个回合的最大步数
 update_frequency = 1024  # 更新频率（收集多少步数据后更新一次策略）- 减小更新频率以提高样本利用率
 
 # 环境和算法参数
-gamma = 0.99        # 折扣因子
+gamma = 0.99        # 折扣回报，智能体对于远期回报的权重
 gae_lambda = 0.98   # GAE参数 - 增加以更好地平衡偏差和方差
 clip_ratio = 0.2    # PPO裁剪参数
 value_coef = 0.5    # 价值损失系数
 entropy_coef = 0.05 # 熵奖励系数 - 增加以鼓励更多探索
-lr = 5e-4           # 学习率 - 略微增加以加快学习
+lr = 5e-4           # 网络参数更新的步长
 hidden_dim = 128    # 隐藏层维度 - 增加网络容量
 
 def train(algorithm='ppo', max_episodes=num_episodes):

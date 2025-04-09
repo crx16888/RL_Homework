@@ -4,6 +4,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 import numpy as np
 from torch.distributions import Normal
+from torch.nn.utils.clip_grad import clip_grad_norm_
 
 # 策略网络
 class PolicyNetwork(nn.Module):
@@ -64,7 +65,7 @@ class PolicyNetwork(nn.Module):
         std = torch.exp(log_std)
         dist = Normal(mean, std)
         
-        log_prob = dist.log_prob(action).sum(dim=-1)
+        log_prob = dist.log_prob(action).sum(dim=-1) # 计算动作的对数概率，即我们随机选择的这个动作在这个策略分布下的对数概率密度
         entropy = dist.entropy().sum(dim=-1) # 策略的熵，表示动作选择的不确定性
         
         return log_prob, entropy
@@ -135,7 +136,7 @@ class RolloutBuffer:
             
             # 计算GAE
             advantage = delta + gamma * gae_lambda * (1 - self.dones[i]) * next_advantage
-            returns.insert(0, advantage + self.values[i])
+            returns.insert(0, advantage + self.values[i]) # A(s,a) = Q(s,a) - V(s),所以Q(s,a) = A(s,a) + V(s)作为真实的回报
             advantages.insert(0, advantage)
             
             next_value = self.values[i]
@@ -182,7 +183,7 @@ class PPO:
         # 将缓冲区数据转换为张量
         states = torch.FloatTensor(np.array(self.buffer.states))
         actions = torch.FloatTensor(np.array(self.buffer.actions))
-        old_logprobs = torch.FloatTensor(np.array(self.buffer.logprobs))
+        old_logprobs = torch.FloatTensor(np.array(self.buffer.logprobs)) # 采样时候的策略评估动作
         old_values = torch.FloatTensor(np.array(self.buffer.values))
         
         # 计算回报和优势
@@ -200,8 +201,8 @@ class PPO:
         
         # 执行多个epoch的更新
         for _ in range(self.update_epochs):
-            # 重新评估动作
-            logprobs, entropy = self.policy.evaluate(states, actions)
+            # 用更新后的策略评估之前的动作（此时还没更新，只能说当前策略）
+            logprobs, entropy = self.policy.evaluate(states, actions) 
             values = self.value(states).squeeze()
             
             # 计算比率 r(θ) = π_θ(a|s) / π_θ_old(a|s)
@@ -227,8 +228,8 @@ class PPO:
             loss.backward()
             
             # 梯度裁剪
-            nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
-            nn.utils.clip_grad_norm_(self.value.parameters(), self.max_grad_norm)
+            clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
+            clip_grad_norm_(self.value.parameters(), self.max_grad_norm)
             
             self.policy_optimizer.step()
             self.value_optimizer.step()
@@ -248,7 +249,7 @@ class PPO:
                 if kl > 1.5 * self.target_kl:
                     break
         
-        # 清空缓冲区
+        # 清空缓冲区 当前代码每次更新就把缓冲器清空了，感觉不够高效利用
         self.buffer.clear()
         
         return policy_loss.item(), value_loss.item(), entropy_loss.item()
